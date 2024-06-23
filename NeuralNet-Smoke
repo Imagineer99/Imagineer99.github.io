@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Integrated Neural Network and Wavy Visualizer</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        #visualizer, #threejs-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="visualizer"></canvas>
+    <canvas id="threejs-canvas"></canvas>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        const canvas = document.getElementById('visualizer');
+        const gl = canvas.getContext('webgl');
+
+        if (!gl) {
+            alert('WebGL not supported');
+            throw new Error('WebGL not supported');
+        }
+
+        const vertexShaderSource = `
+            attribute vec2 a_position;
+            void main() {
+                gl_Position = vec4(a_position, 0.0, 1.0);
+            }
+        `;
+
+        const fragmentShaderSource = `
+            precision highp float;
+            uniform vec2 u_resolution;
+            uniform float u_time;
+
+            float random(vec2 st) {
+                return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+            }
+
+            float noise(vec2 st) {
+                vec2 i = floor(st);
+                vec2 f = fract(st);
+                float a = random(i);
+                float b = random(i + vec2(1.0, 0.0));
+                float c = random(i + vec2(0.0, 1.0));
+                float d = random(i + vec2(1.0, 1.0));
+                vec2 u = f * f * (3.0 - 2.0 * f);
+                return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+            }
+
+            float fbm(vec2 st) {
+                float value = 0.0;
+                float amplitude = 0.5;
+                for (int i = 0; i < 5; i++) {
+                    value += amplitude * noise(st);
+                    st *= 2.0;
+                    amplitude *= 0.5;
+                }
+                return value;
+            }
+
+            void main() {
+                vec2 st = gl_FragCoord.xy / u_resolution.xy;
+                
+                float aspect = u_resolution.x / u_resolution.y;
+                st.x *= aspect;
+
+                vec2 q = vec2(0.);
+                q.x = fbm(st + 0.1 * u_time);
+                q.y = fbm(st + vec2(1.0));
+
+                vec2 r = vec2(0.);
+                r.x = fbm(st + 1.0 * q + vec2(1.7, 9.2) + 0.15 * u_time);
+                r.y = fbm(st + 1.0 * q + vec2(8.3, 2.8) + 0.126 * u_time);
+
+                float f = fbm(st + r);
+
+                vec3 color = mix(
+                    vec3(0.101961, 0.619608, 0.666667),
+                    vec3(0.066667, 0.666667, 0.498039),
+                    clamp((f * f) * 4.0, 0.0, 1.0)
+                );
+
+                color = mix(
+                    color,
+                    vec3(0, 0.223529, 0.517647),
+                    clamp(length(q), 0.0, 1.0)
+                );
+
+                color = mix(
+                    color,
+                    vec3(0.066667, 0.066667, 0.498039),
+                    clamp(length(r.x), 0.0, 1.0)
+                );
+
+                color = (f * f * f + 0.6 * f * f + 0.5 * f) * color;
+
+                gl_FragColor = vec4(color, 1.0);
+            }
+        `;
+
+        function createShader(gl, type, source) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.error('Shader compile error:', gl.getShaderInfoLog(shader));
+                gl.deleteShader(shader);
+                return null;
+            }
+            return shader;
+        }
+
+        const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
+        const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
+
+        const program = gl.createProgram();
+        gl.attachShader(program, vertexShader);
+        gl.attachShader(program, fragmentShader);
+        gl.linkProgram(program);
+
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            console.error('Program link error:', gl.getProgramInfoLog(program));
+            throw new Error('Program link error');
+        }
+
+        const positionAttributeLocation = gl.getAttribLocation(program, 'a_position');
+        const resolutionUniformLocation = gl.getUniformLocation(program, 'u_resolution');
+        const timeUniformLocation = gl.getUniformLocation(program, 'u_time');
+
+        const positionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        const positions = new Float32Array([
+            -1, -1,
+            1, -1,
+            -1, 1,
+            1, 1,
+        ]);
+        gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+
+        function resizeCanvasToDisplaySize(canvas) {
+            const width = canvas.clientWidth;
+            const height = canvas.clientHeight;
+            if (canvas.width !== width || canvas.height !== height) {
+                canvas.width = width;
+                canvas.height = height;
+                return true;
+            }
+            return false;
+        }
+
+        function render(time) {
+            resizeCanvasToDisplaySize(gl.canvas);
+            gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+            gl.useProgram(program);
+
+            gl.enableVertexAttribArray(positionAttributeLocation);
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+            gl.vertexAttribPointer(positionAttributeLocation, 2, gl.FLOAT, false, 0, 0);
+
+            gl.uniform2f(resolutionUniformLocation, gl.canvas.width, gl.canvas.height);
+            gl.uniform1f(timeUniformLocation, time * 0.001);
+
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+            requestAnimationFrame(render);
+        }
+
+        requestAnimationFrame(render);
+
+        // Three.js part
+        const threeCanvas = document.getElementById('threejs-canvas');
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const threeRenderer = new THREE.WebGLRenderer({canvas: threeCanvas, alpha: true});
+        threeRenderer.setSize(window.innerWidth, window.innerHeight);
+        threeRenderer.setClearColor(0x000000, 0); // Set background color to transparent
+
+        const nodes = [];
+        const connections = [];
+        const lights = [];
+        const particleCount = 1000;
+        let particles;
+
+        // Create nodes with subtle glowing effect
+        for (let i = 0; i < 50; i++) {
+            const geometry = new THREE.SphereGeometry(0.05, 32, 32);
+            const material = new THREE.MeshBasicMaterial({color: 0x000000});
+            const node = new THREE.Mesh(geometry, material);
+
+            // Create a subtle glow effect
+            const glowGeometry = new THREE.SphereGeometry(0.1, 32, 32);
+            const glowMaterial = new THREE.MeshBasicMaterial({
+                color: 0x00ffff,
+                transparent: true,
+                opacity: 0.5
+            });
+            const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+            node.add(glow);
+
+            // Add a glowing light to some of the nodes
+            if (Math.random() > 0.7) {  // Randomly add light to some nodes
+                const light = new THREE.PointLight(0x00ffff, 1, 3);
+                light.position.set(node.position.x, node.position.y, node.position.z);
+                lights.push({light, glow});
+                scene.add(light);
+            }
+
+            node.position.set(
+                Math.random() * 10 - 5,
+                Math.random() * 10 - 5,
+                Math.random() * 10 - 5
+            );
+            nodes.push(node);
+            scene.add(node);
+        }
+
+        // Create connections
+        for (let i = 0; i < nodes.length; i++) {
+            for (let j = i + 1; j < nodes.length; j++) {
+                if (Math.random() > 0.85) {
+                    const geometry = new THREE.BufferGeometry().setFromPoints([
+                        nodes[i].position,
+                        nodes[j].position
+                    ]);
+                    const material = new THREE.LineBasicMaterial({
+                        color: 0x0088ff,
+                        transparent: true,
+                        opacity: 0.3
+                    });
+                    const connection = new THREE.Line(geometry, material);
+                    connections.push(connection);
+                    scene.add(connection);
+                }
+            }
+        }
+
+        // Create particle system with glass-like particles
+        const particleGeometry = new THREE.BufferGeometry();
+        const particlePositions = new Float32Array(particleCount * 3);
+        const particleMaterial = new THREE.PointsMaterial({
+            color: 0x00ffff,
+            size: 0.05,
+            transparent: true,
+            opacity: 0.3
+        });
+
+        for (let i = 0; i < particleCount * 3; i += 3) {
+            particlePositions[i] = Math.random() * 10 - 5;
+            particlePositions[i + 1] = Math.random() * 10 - 5;
+            particlePositions[i + 2] = Math.random() * 10 - 5;
+        }
+
+        particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+        particles = new THREE.Points(particleGeometry, particleMaterial);
+        scene.add(particles);
+
+        camera.position.z = 8;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Rotate the entire scene
+            scene.rotation.y += 0.002;
+            
+            // Animate particles
+            const positions = particles.geometry.attributes.position.array;
+            for (let i = 0; i < positions.length; i += 3) {
+                positions[i] += Math.sin(Date.now() * 0.001 + i) * 0.01;
+                positions[i + 1] += Math.cos(Date.now() * 0.002 + i) * 0.01;
+                positions[i + 2] += Math.sin(Date.now() * 0.003 + i) * 0.01;
+            }
+            particles.geometry.attributes.position.needsUpdate = true;
+
+            // Pulse nodes and change colors
+            nodes.forEach((node, index) => {
+                const scale = 1 + Math.sin(Date.now() * 0.003 + index) * 0.1;
+                node.scale.setScalar(scale);
+
+                if (node.children[0]) {
+                    const glow = node.children[0];
+                    const colorChange = (Math.sin(Date.now() * 0.001 + index) * 0.5 + 0.5) * 255;
+                    glow.material.color.setRGB(colorChange / 255, 1, 1);
+                }
+            });
+
+            // Update light colors
+            lights.forEach(({light, glow}, index) => {
+                const colorChange = (Math.sin(Date.now() * 0.002 + index) * 0.5 + 0.5) * 255;
+                const color = new THREE.Color();
+                color.setRGB(colorChange / 255, 1, 1);
+                light.color = color;
+                glow.material.color = color;
+            });
+
+            // Update connections
+            connections.forEach((connection, index) => {
+                connection.material.opacity = 0.1 + Math.sin(Date.now() * 0.002 + index) * 0.1;
+            });
+
+            threeRenderer.render(scene, camera);
+        }
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            resizeCanvasToDisplaySize(gl.canvas);
+            threeRenderer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+        });
+    </script>
+</body>
+</html>
