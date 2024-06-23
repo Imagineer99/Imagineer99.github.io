@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Artistic Neural Network Visualizer</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <canvas id="neuralNetworkCanvas"></canvas>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({canvas: document.getElementById('neuralNetworkCanvas'), antialias: true});
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000819);
+
+        const nodes = [];
+        const connections = [];
+        const lights = [];
+        const particleCount = 1000;
+        let particles;
+
+        // Create nodes with subtle glowing effect
+        for (let i = 0; i < 50; i++) {
+            const geometry = new THREE.SphereGeometry(0.05, 32, 32);
+            const material = new THREE.MeshBasicMaterial({color: 0x000000});
+            const node = new THREE.Mesh(geometry, material);
+
+            // Create a subtle glow effect
+            const glowGeometry = new THREE.SphereGeometry(0.1, 32, 32);
+            const glowMaterial = new THREE.MeshBasicMaterial({
+                color: 0x00ffff,
+                transparent: true,
+                opacity: 0.5
+            });
+            const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+            node.add(glow);
+
+            // Add a glowing light to some of the nodes
+            if (Math.random() > 0.7) {  // Randomly add light to some nodes
+                const light = new THREE.PointLight(0x00ffff, 1, 3);
+                light.position.set(node.position.x, node.position.y, node.position.z);
+                lights.push({light, glow});
+                scene.add(light);
+            }
+
+            node.position.set(
+                Math.random() * 10 - 5,
+                Math.random() * 10 - 5,
+                Math.random() * 10 - 5
+            );
+            nodes.push(node);
+            scene.add(node);
+        }
+
+        // Create connections
+        for (let i = 0; i < nodes.length; i++) {
+            for (let j = i + 1; j < nodes.length; j++) {
+                if (Math.random() > 0.85) {
+                    const geometry = new THREE.BufferGeometry().setFromPoints([
+                        nodes[i].position,
+                        nodes[j].position
+                    ]);
+                    const material = new THREE.LineBasicMaterial({
+                        color: 0x0088ff,
+                        transparent: true,
+                        opacity: 0.3
+                    });
+                    const connection = new THREE.Line(geometry, material);
+                    connections.push(connection);
+                    scene.add(connection);
+                }
+            }
+        }
+
+        // Create particle system with glass-like particles
+        const particleGeometry = new THREE.BufferGeometry();
+        const particlePositions = new Float32Array(particleCount * 3);
+        const particleMaterial = new THREE.PointsMaterial({
+            color: 0x00ffff,
+            size: 0.05,
+            transparent: true,
+            opacity: 0.3
+        });
+
+        for (let i = 0; i < particleCount * 3; i += 3) {
+            particlePositions[i] = Math.random() * 10 - 5;
+            particlePositions[i + 1] = Math.random() * 10 - 5;
+            particlePositions[i + 2] = Math.random() * 10 - 5;
+        }
+
+        particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+        particles = new THREE.Points(particleGeometry, particleMaterial);
+        scene.add(particles);
+
+        camera.position.z = 8;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Rotate the entire scene
+            scene.rotation.y += 0.002;
+            
+            // Animate particles
+            const positions = particles.geometry.attributes.position.array;
+            for (let i = 0; i < positions.length; i += 3) {
+                positions[i] += Math.sin(Date.now() * 0.001 + i) * 0.01;
+                positions[i + 1] += Math.cos(Date.now() * 0.002 + i) * 0.01;
+                positions[i + 2] += Math.sin(Date.now() * 0.003 + i) * 0.01;
+            }
+            particles.geometry.attributes.position.needsUpdate = true;
+
+            // Pulse nodes and change colors
+            nodes.forEach((node, index) => {
+                const scale = 1 + Math.sin(Date.now() * 0.003 + index) * 0.1;
+                node.scale.setScalar(scale);
+
+                if (node.children[0]) {
+                    const glow = node.children[0];
+                    const colorChange = (Math.sin(Date.now() * 0.001 + index) * 0.5 + 0.5) * 255;
+                    glow.material.color.setRGB(colorChange / 255, 1, 1);
+                }
+            });
+
+            // Update light colors
+            lights.forEach(({light, glow}, index) => {
+                const colorChange = (Math.sin(Date.now() * 0.002 + index) * 0.5 + 0.5) * 255;
+                const color = new THREE.Color();
+                color.setRGB(colorChange / 255, 1, 1);
+                light.color = color;
+                glow.material.color = color;
+            });
+
+            // Update connections
+            connections.forEach((connection, index) => {
+                connection.material.opacity = 0.1 + Math.sin(Date.now() * 0.002 + index) * 0.1;
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
