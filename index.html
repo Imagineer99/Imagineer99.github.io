@@ -64,11 +64,15 @@
             z-index: 999;
             pointer-events: none;
         }
+        body.no-cursor {
+            cursor: none;
+        }
     </style>
 </head>
 <body>
     <div id="menu">
         <div>
+            <div>Click to Play</div>
             <button id="startBtn" class="btn">Play</button>
         </div>
     </div>
@@ -184,18 +188,21 @@
         function startAudio() {
             document.getElementById('menu').classList.add('hidden');
             document.getElementById('blur').style.display = 'none';
+            document.body.classList.add('no-cursor');
+
+            // Stop and disconnect previous audio source if it exists
+            if (currentSource) {
+                currentSource.stop();
+                currentSource.disconnect();
+            }
 
             fetch('sound.mp3')
                 .then(response => response.arrayBuffer())
                 .then(data => {
                     audioContext.decodeAudioData(data, buffer => {
-                        if (currentSource) {
-                            currentSource.stop();
-                            currentSource.disconnect();
-                        }
                         currentSource = audioContext.createBufferSource();
                         currentSource.buffer = buffer;
-                        currentSource.loop = true;
+                        currentSource.loop = true; // Set to loop
                         currentSource.connect(analyser);
                         analyser.connect(audioContext.destination);
                         currentSource.start(0);
