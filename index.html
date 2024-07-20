@@ -120,9 +120,20 @@
 
         function setupAudio() {
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            analyser = audioContext.createAnalyser();
-            analyser.fftSize = 256;
 
+            // Ensure the audio context is unlocked
+            const unlockAudio = () => {
+                audioContext.resume().then(() => {
+                    console.log('Audio context unlocked.');
+                    fetchAudio();
+                });
+            };
+
+            document.body.addEventListener('click', unlockAudio);
+            document.body.addEventListener('touchstart', unlockAudio);
+        }
+
+        function fetchAudio() {
             fetch('sound.mp3')
                 .then(response => response.arrayBuffer())
                 .then(data => {
@@ -130,8 +141,7 @@
                         source = audioContext.createBufferSource();
                         source.buffer = buffer;
                         source.loop = true;
-                        source.connect(analyser);
-                        analyser.connect(audioContext.destination);
+                        source.connect(audioContext.destination);
                         source.start(0);
                     });
                 });
