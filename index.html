@@ -146,6 +146,7 @@
         let audioContext, analyser, source;
         let audioLow = 0, audioMid = 0, audioHigh = 0;
         let currentSource = null;
+        let isPlaying = false;
 
         function init() {
             scene = new THREE.Scene();
@@ -173,12 +174,10 @@
             window.addEventListener('resize', onWindowResize, false);
             document.addEventListener('mousemove', onMouseMove, false);
 
-            // Initialize the audio context
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             analyser = audioContext.createAnalyser();
             analyser.fftSize = 256;
 
-            // Prepare the menu
             document.getElementById('startBtn').addEventListener('click', startAudio);
 
             onWindowResize();
@@ -190,19 +189,22 @@
             document.getElementById('blur').style.display = 'none';
             document.body.classList.add('no-cursor');
 
-            // Stop and disconnect previous audio source if it exists
-            if (currentSource) {
-                currentSource.stop();
-                currentSource.disconnect();
-            }
+            if (isPlaying) return; // Prevent multiple starts
+
+            isPlaying = true;
 
             fetch('sound.mp3')
                 .then(response => response.arrayBuffer())
                 .then(data => {
                     audioContext.decodeAudioData(data, buffer => {
+                        if (currentSource) {
+                            currentSource.stop();
+                            currentSource.disconnect();
+                        }
+
                         currentSource = audioContext.createBufferSource();
                         currentSource.buffer = buffer;
-                        currentSource.loop = true; // Set to loop
+                        currentSource.loop = true; // Ensure it loops
                         currentSource.connect(analyser);
                         analyser.connect(audioContext.destination);
                         currentSource.start(0);
