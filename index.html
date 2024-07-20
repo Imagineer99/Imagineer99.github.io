@@ -15,39 +15,9 @@
             width: 100%; 
             height: 100%; 
         }
-        #audioControls {
-            position: absolute;
-            bottom: 20px;
-            width: 100%;
-            text-align: center;
-            color: white;
-            z-index: 1000;
-        }
-        .btn {
-            background: linear-gradient(45deg, #4a0080, #9900ff);
-            border: none;
-            color: white;
-            padding: 10px 20px;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 16px;
-            margin: 4px 2px;
-            cursor: pointer;
-            border-radius: 25px;
-            transition: all 0.3s ease;
-            box-shadow: 0 0 15px rgba(153, 0, 255, 0.5);
-        }
-        .btn:hover {
-            background: linear-gradient(45deg, #5a00a0, #b300ff);
-            box-shadow: 0 0 20px rgba(153, 0, 255, 0.8);
-        }
     </style>
 </head>
 <body>
-    <div id="audioControls">
-        <button id="playPauseBtn" class="btn">Play/Pause</button>
-    </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script id="vertexShader" type="x-shader/x-vertex">
         varying vec2 vUv;
@@ -96,17 +66,17 @@
             n = pow(n, 1.2);
             
             vec3 color = hsv2rgb(vec3(
-                fract(n * 0.5 + t * 0.1 + audioLow * 0.5),
-                0.7 + 0.3 * sin(n * PI * 2.0) + audioMid * 0.3,
-                0.6 + 0.4 * n + audioHigh * 0.2
+                fract(n * 0.5 + t * 0.1 + audioLow * 0.6),
+                0.7 + 0.3 * sin(n * PI * 2.0) + audioMid * 0.36,
+                0.6 + 0.4 * n + audioHigh * 0.24
             ));
             
-            color += vec3(audioLow, audioMid, audioHigh) * 0.2;
+            color += vec3(audioLow, audioMid, audioHigh) * 0.24;
             
-            color = mix(color, vec3(0.5, 0.0, 1.0), 0.2 + audioMid * 0.1);
+            color = mix(color, vec3(0.5, 0.0, 1.0), 0.24 + audioMid * 0.12);
             
             float mouseDist = distance(uv, mouse);
-            color += vec3(0.8, 0.4, 1.0) * smoothstep(0.2, 0.0, mouseDist) * (0.5 + audioHigh * 0.5);
+            color += vec3(0.8, 0.4, 1.0) * smoothstep(0.2, 0.0, mouseDist) * (0.5 + audioHigh * 0.6);
             
             gl_FragColor = vec4(color, 1.0);
         }
@@ -116,7 +86,6 @@
         let mouseX = 0, mouseY = 0;
         let audioContext, analyser, source;
         let audioLow = 0, audioMid = 0, audioHigh = 0;
-        let audioBufferSourceNode;
 
         function init() {
             scene = new THREE.Scene();
@@ -158,25 +127,14 @@
                 .then(response => response.arrayBuffer())
                 .then(data => {
                     audioContext.decodeAudioData(data, buffer => {
-                        if (audioBufferSourceNode) {
-                            audioBufferSourceNode.disconnect();
-                        }
-                        audioBufferSourceNode = audioContext.createBufferSource();
-                        audioBufferSourceNode.buffer = buffer;
-                        audioBufferSourceNode.loop = true;
-                        audioBufferSourceNode.connect(analyser);
+                        source = audioContext.createBufferSource();
+                        source.buffer = buffer;
+                        source.loop = true;
+                        source.connect(analyser);
                         analyser.connect(audioContext.destination);
-                        audioBufferSourceNode.start(0);
+                        source.start(0);
                     });
                 });
-
-            document.getElementById('playPauseBtn').addEventListener('click', function() {
-                if (audioContext.state === 'suspended') {
-                    audioContext.resume();
-                } else if (audioContext.state === 'running') {
-                    audioContext.suspend();
-                }
-            });
         }
 
         function onWindowResize() {
