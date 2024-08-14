@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animated Fermion Interactions and Beta Decay</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix-min.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: black; }
+        canvas { width: 100vw; height: 100vh; display: block; }
+    </style>
+</head>
+<body>
+    <canvas id="glcanvas"></canvas>
+    <script>
+        const canvas = document.getElementById('glcanvas');
+        canvas.width = window.innerWidth * 2;
+        canvas.height = window.innerHeight * 2;
+        const gl = canvas.getContext('webgl');
+
+        if (!gl) {
+            alert('Unable to initialize WebGL. Your browser or machine may not support it.');
+        }
+
+        const vsSource = `
+            attribute vec4 aVertexPosition;
+            attribute vec4 aVertexColor;
+            attribute float aSize;
+            attribute float aType;
+            uniform mat4 uModelViewMatrix;
+            uniform mat4 uProjectionMatrix;
+            uniform float uTime;
+            varying lowp vec4 vColor;
+            varying float vType;
+            void main(void) {
+                float pulsate = sin(uTime * 2.0 + aVertexPosition.x * 10.0) * 0.5 + 0.5;
+                vec4 position = aVertexPosition;
+                // Simulate weak interaction range
+                float interactionRange = 0.1;
+                position.xyz += normalize(position.xyz) * (pulsate * interactionRange);
+                gl_Position = uProjectionMatrix * uModelViewMatrix * position;
+                gl_PointSize = aSize * (1.5 + pulsate * 0.5);
+                vColor = aVertexColor;
+                vType = aType;
+            }
+        `;
+
+        const fsSource = `
+            precision mediump float;
+            varying lowp vec4 vColor;
+            varying float vType;
+            void main(void) {
+                float dist = distance(gl_PointCoord, vec2(0.5));
+                if (dist > 0.5) {
+                    discard;
+                }
+                float alpha = smoothstep(0.5, 0.2, dist);
+                vec4 color = vColor;
+                // Add glow effect based on particle type
+                if (vType == 0.0) { // Quark
+                    color.rgb += vec3(0.2, 0.0, 0.0) * (1.0 - dist);
+                } else if (vType == 1.0) { // Lepton
+                    color.rgb += vec3(0.0, 0.2, 0.0) * (1.0 - dist);
+                } else if (vType == 2.0) { // Neutrino
+                    color.rgb += vec3(0.0, 0.0, 0.2) * (1.0 - dist);
+                }
+                gl_FragColor = vec4(color.rgb, color.a * alpha);
+            }
+        `;
+
+        function initShaderProgram(gl, vsSource, fsSource) {
+            const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource);
+            const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
+            const shaderProgram = gl.createProgram();
+            gl.attachShader(shaderProgram, vertexShader);
+            gl.attachShader(shaderProgram, fragmentShader);
+            gl.linkProgram(shaderProgram);
+
+            if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+                alert('Unable to initialize the shader program: ' + gl.getProgramInfoLog(shaderProgram));
+                return null;
+            }
+
+            return shaderProgram;
+        }
+
+        function loadShader(gl, type, source) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                alert('An error occurred compiling the shaders: ' + gl.getShaderInfoLog(shader));
+                gl.deleteShader(shader);
+                return null;
+            }
+
+            return shader;
+        }
+
+        const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
+        const programInfo = {
+            program: shaderProgram,
+            attribLocations: {
+                vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+                vertexColor: gl.getAttribLocation(shaderProgram, 'aVertexColor'),
+                size: gl.getAttribLocation(shaderProgram, 'aSize'),
+                type: gl.getAttribLocation(shaderProgram, 'aType'),
+            },
+            uniformLocations: {
+                projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
+                modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
+                time: gl.getUniformLocation(shaderProgram, 'uTime'),
+            },
+        };
+
+        function initBuffers(gl) {
+            const particleCount = 10000;
+            const positions = new Float32Array(particleCount * 3);
+            const colors = new Float32Array(particleCount * 4);
+            const sizes = new Float32Array(particleCount);
+            const types = new Float32Array(particleCount);
+
+            for (let i = 0; i < particleCount; i++) {
+                const idx = i * 3;
+                const colorIdx = i * 4;
+
+                // Position
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                const r = Math.random() * 5 + 1;
+                positions[idx] = r * Math.sin(phi) * Math.cos(theta);
+                positions[idx + 1] = r * Math.sin(phi) * Math.sin(theta);
+                positions[idx + 2] = r * Math.cos(phi);
+
+                // Type and Color
+                const particleType = Math.floor(Math.random() * 3);
+                types[i] = particleType;
+                switch(particleType) {
+                    case 0: // Quark (red)
+                        colors[colorIdx] = 1;
+                        colors[colorIdx + 1] = 0.2;
+                        colors[colorIdx + 2] = 0.2;
+                        break;
+                    case 1: // Lepton (green)
+                        colors[colorIdx] = 0.2;
+                        colors[colorIdx + 1] = 1;
+                        colors[colorIdx + 2] = 0.2;
+                        break;
+                    case 2: // Neutrino (blue)
+                        colors[colorIdx] = 0.2;
+                        colors[colorIdx + 1] = 0.2;
+                        colors[colorIdx + 2] = 1;
+                        break;
+                }
+                colors[colorIdx + 3] = 0.8; // Alpha
+
+                // Size
+                sizes[i] = 2 + Math.random() * 2;
+            }
+
+            const positionBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, positions, gl.DYNAMIC_DRAW);
+
+            const colorBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, colors, gl.DYNAMIC_DRAW);
+
+            const sizeBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, sizeBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, sizes, gl.STATIC_DRAW);
+
+            const typeBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, typeBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, types, gl.DYNAMIC_DRAW);
+
+            return { 
+                position: positionBuffer, 
+                color: colorBuffer, 
+                size: sizeBuffer, 
+                type: typeBuffer,
+                count: particleCount,
+                positionArray: positions,
+                colorArray: colors,
+                typeArray: types
+            };
+        }
+
+        function simulateBetaDecay(buffers, time) {
+            const decayProbability = 0.001;
+            for (let i = 0; i < buffers.count; i++) {
+                if (buffers.typeArray[i] === 0 && Math.random() < decayProbability) {
+                    // Quark decays
+                    buffers.typeArray[i] = 1; // Change to lepton
+                    const colorIdx = i * 4;
+                    buffers.colorArray[colorIdx] = 0.2;
+                    buffers.colorArray[colorIdx + 1] = 1;
+                    buffers.colorArray[colorIdx + 2] = 0.2;
+
+                    // Create a neutrino
+                    const nearestEmptyParticle = findNearestEmptyParticle(buffers, i);
+                    if (nearestEmptyParticle !== -1) {
+                        buffers.typeArray[nearestEmptyParticle] = 2;
+                        const newColorIdx = nearestEmptyParticle * 4;
+                        buffers.colorArray[newColorIdx] = 0.2;
+                        buffers.colorArray[newColorIdx + 1] = 0.2;
+                        buffers.colorArray[newColorIdx + 2] = 1;
+                        buffers.colorArray[newColorIdx + 3] = 0.8;
+                    }
+                }
+            }
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffers.color);
+            gl.bufferData(gl.ARRAY_BUFFER, buffers.colorArray, gl.DYNAMIC_DRAW);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffers.type);
+            gl.bufferData(gl.ARRAY_BUFFER, buffers.typeArray, gl.DYNAMIC_DRAW);
+        }
+
+        function findNearestEmptyParticle(buffers, currentIndex) {
+            const currentPos = buffers.positionArray.slice(currentIndex * 3, currentIndex * 3 + 3);
+            let nearestEmptyIndex = -1;
+            let minDistance = Infinity;
+
+            for (let i = 0; i < buffers.count; i++) {
+                if (buffers.typeArray[i] === -1) {
+                    const pos = buffers.positionArray.slice(i * 3, i * 3 + 3);
+                    const distance = vec3.distance(currentPos, pos);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        nearestEmptyIndex = i;
+                    }
+                }
+            }
+
+            return nearestEmptyIndex;
+        }
+
+        function drawScene(gl, programInfo, buffers, deltaTime) {
+            gl.clearColor(0.0, 0.0, 0.0, 1.0);
+            gl.clearDepth(1.0);
+            gl.enable(gl.DEPTH_TEST);
+            gl.depthFunc(gl.LEQUAL);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+            const fieldOfView = 45 * Math.PI / 180;
+            const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
+            const zNear = 0.1;
+            const zFar = 100.0;
+            const projectionMatrix = mat4.create();
+            mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar);
+
+            const modelViewMatrix = mat4.create();
+            mat4.translate(modelViewMatrix, modelViewMatrix, [0.0, 0.0, -20.0]);
+            mat4.rotate(modelViewMatrix, modelViewMatrix, rotation[0], [1, 0, 0]);
+            mat4.rotate(modelViewMatrix, modelViewMatrix, rotation[1], [0, 1, 0]);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffers.position);
+            gl.vertexAttribPointer(programInfo.attribLocations.vertexPosition, 3, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffers.color);
+            gl.vertexAttribPointer(programInfo.attribLocations.vertexColor, 4, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(programInfo.attribLocations.vertexColor);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffers.size);
+            gl.vertexAttribPointer(programInfo.attribLocations.size, 1, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(programInfo.attribLocations.size);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, buffers.type);
+            gl.vertexAttribPointer(programInfo.attribLocations.type, 1, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(programInfo.attribLocations.type);
+
+            gl.useProgram(programInfo.program);
+            gl.uniformMatrix4fv(programInfo.uniformLocations.projectionMatrix, false, projectionMatrix);
+            gl.uniformMatrix4fv(programInfo.uniformLocations.modelViewMatrix, false, modelViewMatrix);
+            gl.uniform1f(programInfo.uniformLocations.time, time);
+
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+
+            gl.drawArrays(gl.POINTS, 0, buffers.count);
+
+            rotation[0] += deltaTime * 0.1;
+            rotation[1] += deltaTime * 0.15;
+            time += deltaTime;
+        }
+
+        let rotation = [0, 0];
+        let time = 0;
+        let then = 0;
+        const buffers = initBuffers(gl);
+
+        function render(now) {
+            now *= 0.001;
+            const deltaTime = now - then;
+            then = now;
+
+            simulateBetaDecay(buffers, time);
+            drawScene(gl, programInfo, buffers, deltaTime);
+            requestAnimationFrame(render);
+        }
+
+        requestAnimationFrame(render);
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth * 2;
+            canvas.height = window.innerHeight * 2;
+            gl.viewport(0, 0, canvas.width, canvas.height);
+        });
+    </script>
+</body>
+</html>
