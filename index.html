@@ -1,0 +1,291 @@
+import React, { useState, useEffect } from 'react';
+import { motion, useViewportScroll, useTransform, useSpring } from 'framer-motion';
+import { Menu, X, Cloud, Brain, Zap, ChevronUp } from 'lucide-react';
+
+const HeavenLabsAIDynamicLandingPage = () => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState('home');
+  const { scrollY } = useViewportScroll();
+
+  const sections = ['home', 'about', 'services', 'contact'];
+
+  const opacity = useTransform(scrollY, [0, 100], [0, 1]);
+  const scale = useTransform(scrollY, [0, 100], [0.8, 1]);
+  const y = useTransform(scrollY, [0, 100], [50, 0]);
+
+  const springConfig = { stiffness: 100, damping: 30, restDelta: 0.001 };
+  const scaleSpring = useSpring(scale, springConfig);
+  const ySpring = useSpring(y, springConfig);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY;
+      const windowHeight = window.innerHeight;
+      const offset = windowHeight / 2;
+
+      sections.forEach((section) => {
+        const element = document.getElementById(section);
+        if (element) {
+          const { top, bottom } = element.getBoundingClientRect();
+          if (top <= offset && bottom > offset) {
+            setActiveSection(section);
+          }
+        }
+      });
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollTo = (id) => {
+    const element = document.getElementById(id);
+    element.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-100 to-white text-gray-800 overflow-x-hidden">
+      <motion.header 
+        className="fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-white bg-opacity-70 backdrop-blur-md"
+        style={{ opacity, boxShadow: useTransform(scrollY, [0, 100], ['0px 0px 0px rgba(0,0,0,0)', '0px 5px 15px rgba(0,0,0,0.1)']) }}
+      >
+        <nav className="container mx-auto px-6 py-4 flex justify-between items-center">
+          <motion.div 
+            className="text-3xl font-bold text-red-600"
+            whileHover={{ scale: 1.05 }}
+          >
+            heavenlabs.ai
+          </motion.div>
+          <div className="hidden md:flex space-x-8">
+            {sections.map((item) => (
+              <motion.a
+                key={item}
+                href={`#${item}`}
+                className={`text-sm ${activeSection === item ? 'text-red-600' : 'text-gray-600'} hover:text-red-600 transition-colors`}
+                whileHover={{ scale: 1.1 }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  scrollTo(item);
+                }}
+              >
+                {item.charAt(0).toUpperCase() + item.slice(1)}
+              </motion.a>
+            ))}
+          </div>
+          <div className="md:hidden">
+            <motion.button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="text-gray-600 focus:outline-none"
+              whileTap={{ scale: 0.95 }}
+            >
+              {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </motion.button>
+          </div>
+        </nav>
+      </motion.header>
+
+      {isMenuOpen && (
+        <motion.div 
+          className="fixed inset-0 bg-white bg-opacity-95 backdrop-blur-md z-40"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <div className="container mx-auto px-6 py-16 flex flex-col items-center space-y-8">
+            {sections.map((item) => (
+              <motion.a
+                key={item}
+                href={`#${item}`}
+                className="text-xl text-gray-600 hover:text-red-600 transition-colors"
+                whileHover={{ scale: 1.1 }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  scrollTo(item);
+                  setIsMenuOpen(false);
+                }}
+              >
+                {item.charAt(0).toUpperCase() + item.slice(1)}
+              </motion.a>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      <main>
+        <motion.section
+          id="home"
+          className="min-h-screen flex items-center justify-center relative overflow-hidden"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          <motion.div
+            className="absolute inset-0 flex items-center justify-center"
+            style={{ scale: scaleSpring, y: ySpring }}
+          >
+            <div className="text-[20rem] font-bold text-red-100 select-none">AI</div>
+          </motion.div>
+          <div className="container mx-auto px-6 text-center z-10">
+            <motion.h1 
+              className="text-5xl md:text-7xl font-bold mb-8 text-gray-800"
+              initial={{ y: 50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.2, duration: 0.8 }}
+            >
+              Welcome to <span className="text-red-600">heavenlabs.ai</span>
+            </motion.h1>
+            <motion.p 
+              className="text-xl md:text-2xl mb-12 max-w-2xl mx-auto text-gray-600"
+              initial={{ y: 50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.4, duration: 0.8 }}
+            >
+              Elevating AI to new heights. Discover the celestial possibilities of artificial intelligence with HeavenLabs.
+            </motion.p>
+            <motion.button
+              className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-colors"
+              whileHover={{ scale: 1.05, boxShadow: "0 0 15px rgba(220, 38, 38, 0.3)" }}
+              whileTap={{ scale: 0.95 }}
+              initial={{ y: 50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.6, duration: 0.8 }}
+            >
+              Explore Our Solutions
+            </motion.button>
+          </div>
+        </motion.section>
+
+        <motion.section
+          id="about"
+          className="py-32 relative overflow-hidden"
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+        >
+          <motion.div
+            className="absolute inset-0 flex items-center justify-center"
+            style={{ 
+              scale: useTransform(scrollY, [window.innerHeight, window.innerHeight * 2], [0.8, 1]),
+              opacity: useTransform(scrollY, [window.innerHeight, window.innerHeight * 2], [0.2, 0.1])
+            }}
+          >
+            <div className="text-[30rem] font-bold text-red-50 select-none">AI</div>
+          </motion.div>
+          <div className="container mx-auto px-6 relative z-10">
+            <h2 className="text-4xl font-bold mb-12 text-center text-gray-800">About HeavenLabs AI</h2>
+            <div className="grid md:grid-cols-3 gap-12">
+              {[
+                { icon: Cloud, title: "Cloud-Powered", description: "Harness the power of cloud computing for scalable AI solutions." },
+                { icon: Brain, title: "Advanced Algorithms", description: "Cutting-edge machine learning algorithms for complex problem-solving." },
+                { icon: Zap, title: "Real-Time Processing", description: "Lightning-fast processing for immediate insights and actions." }
+              ].map((item, index) => (
+                <motion.div 
+                  key={index} 
+                  className="bg-white bg-opacity-50 backdrop-blur-md p-6 rounded-xl shadow-lg border border-gray-200"
+                  initial={{ y: 50, opacity: 0 }}
+                  whileInView={{ y: 0, opacity: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.2, duration: 0.5 }}
+                  whileHover={{ scale: 1.05, boxShadow: "0 0 20px rgba(220, 38, 38, 0.1)" }}
+                >
+                  <item.icon className="w-12 h-12 mb-4 text-red-600" />
+                  <h3 className="text-xl font-semibold mb-2 text-gray-800">{item.title}</h3>
+                  <p className="text-gray-600">{item.description}</p>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </motion.section>
+
+        <motion.section
+          id="services"
+          className="py-32 bg-gray-50"
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="container mx-auto px-6">
+            <h2 className="text-4xl font-bold mb-12 text-center text-gray-800">Our Services</h2>
+            <div className="grid md:grid-cols-2 gap-12">
+              {[
+                "Natural Language Processing",
+                "Computer Vision",
+                "Predictive Analytics",
+                "Autonomous Systems"
+              ].map((service, index) => (
+                <motion.div 
+                  key={index}
+                  className="bg-white bg-opacity-50 backdrop-blur-md p-6 rounded-xl shadow-lg border border-gray-200"
+                  initial={{ x: index % 2 === 0 ? -50 : 50, opacity: 0 }}
+                  whileInView={{ x: 0, opacity: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.2, duration: 0.5 }}
+                  whileHover={{ scale: 1.05, boxShadow: "0 0 20px rgba(220, 38, 38, 0.1)" }}
+                >
+                  <h3 className="text-2xl font-semibold mb-4 text-red-600">{service}</h3>
+                  <p className="text-gray-600">Leveraging advanced AI techniques to deliver cutting-edge solutions in {service.toLowerCase()}.</p>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </motion.section>
+
+        <motion.section
+          id="contact"
+          className="py-32"
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="container mx-auto px-6 text-center">
+            <h2 className="text-4xl font-bold mb-12 text-gray-800">Contact Us</h2>
+            <p className="text-xl mb-8 text-gray-600">Ready to elevate your AI journey? Get in touch with us today.</p>
+            <motion.button
+              className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-colors"
+              whileHover={{ scale: 1.05, boxShadow: "0 0 15px rgba(220, 38, 38, 0.3)" }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Contact HeavenLabs AI
+            </motion.button>
+          </div>
+        </motion.section>
+      </main>
+
+      <footer className="bg-white bg-opacity-70 backdrop-blur-md py-8">
+        <div className="container mx-auto px-6 text-center text-gray-600">
+          <p>&copy; 2024 heavenlabs.ai. All rights reserved.</p>
+        </div>
+      </footer>
+
+      <motion.div 
+        className="fixed bottom-8 right-8 bg-red-600 text-white p-2 rounded-full cursor-pointer shadow-lg"
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.9 }}
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: scrollY > 100 ? 1 : 0 }}
+      >
+        <ChevronUp size={24} />
+      </motion.div>
+
+      <motion.div className="fixed top-1/2 right-8 -translate-y-1/2 space-y-4">
+        {sections.map((section, index) => (
+          <motion.div
+            key={section}
+            className={`w-3 h-3 rounded-full cursor-pointer ${activeSection === section ? 'bg-red-600' : 'bg-gray-300'}`}
+            whileHover={{ scale: 1.5 }}
+            onClick={() => scrollTo(section)}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: index * 0.1 }}
+          />
+        ))}
+      </motion.div>
+    </div>
+  );
+};
+
+export default HeavenLabsAIDynamicLandingPage;
